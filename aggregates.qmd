@@ -166,57 +166,59 @@ md_churches |>
 
 In the last example, we grouped like records together and counted them, but there's so much more we can do to summarize each group.
 
-Let's say we wanted to know the total number of seats offered in each term? For that, we could use the `sum()` function to add up all of the values in the column "seats". We put the column we want to total -- "seats" -- inside the sum() function `sum(seats)`. Note that we can simply add a new summarize function here, keeping our count_classes field in our output table.
+To do that, we'll load an use a different CSV file - this one of "mega-churches". These are churches with large congregations, often in the thousands. This data set comes from [Hartford International University](https://hirr.hartfordinternational.edu/research/megachurch-database/full-list-of-megachurches/) and contains information about the church name, city, state, attendance, denomination and website. Let's load it and take a look at the first few rows:
 
 ```{r}
-umd_courses |>
-  group_by(term) |>
-  summarise(
-    count_classes = n(),
-    total_seats = sum(seats)
-  ) |>
-  arrange(desc(total_seats))
+megachurches <- read_csv("data/megachurches.csv")
+head(megachurches)
 ```
 
-We can also calculate the average number of seats for each department -- the mean -- and the number that sits at the midpoint of our data -- the median.
+Now let's say we wanted to know the total attendance for each denomination? For that, we could use the `sum()` function to add up all of the values in the column "size". We group by `denomination` and put the column we want to total -- `size` -- inside the sum() function `sum(size)` and give it a name -- `total_size` -- like this:
 
 ```{r}
-umd_courses |>
-  group_by(term) |>
+megachurches |>
+  group_by(denomination) |>
   summarise(
-    count_classes = n(),
-    total_seats = sum(seats),
-    mean_seats = mean(seats),
-    median_seats = median(seats)
+    total_size = sum(size)
   ) |>
-  arrange(desc(total_seats))
+  arrange(desc(total_size))
+```
+
+We can also calculate the average size of churches in each denomination using the `mean()` function, and add the `median`, too, like this:
+
+```{r}
+megachurches |>
+  group_by(denomination) |>
+  summarise(
+    total_size = sum(size),
+    mean_size = mean(size),
+    median_size = median(size)
+  ) |>
+  arrange(desc(total_size))
 ```
 
 We see something interesting here. The mean number of seats is higher than the median number in most cases, but the difference isn't always huge. In some cases the mean gets skewed by larger or lower amounts. Examining both the median -- which is less sensitive to extreme values -- and the mean -- which is more sensitive to extreme values -- gives you a clearer picture of the composition of the data.
 
-What about the highest and lowest number of seats for each department? For that, we can use the `min()` and `max()` functions.
+What about the highest and lowest sizes for each denomination? For that, we can use the `min()` and `max()` functions.
 
 ```{r}
-umd_courses |>
-  group_by(department) |>
+megachurches |>
+  group_by(denomination) |>
   summarise(
-    count_classes = n(),
-    total_seats = sum(seats),
-    mean_seats = mean(seats),
-    median_seats = median(seats),
-    min_seats = min(seats),
-    max_seats = max(seats)
+    total_size = sum(size),
+    mean_size = mean(size),
+    median_size = median(size),
+    min_size = min(size),
+    max_size = max(size)
   ) |>
-  arrange(desc(total_seats))
+  arrange(desc(total_size))
 ```
 
-From this, we can see that every department has courses with 0 seats listed. We'll need to account for those in any analysis, probably by excluding them. The variation in mean and median seats is interesting, too: look at Mathematics and English compared to Computer Science and Engineering, for example. These patterns aren't random: departments make choices about the courses they offer.
-
-It would be interesting to see what the course with the largest number of seats is. To do that, we could simply take our original data set and sort it from highest to lowest on seats
+It would be interesting to see what the church with the largest size is. To do that, we can just use `arrange()` on the whole dataset, like this:`
 
 ```{r}
-umd_courses |>
-  arrange(desc(seats))
+megachurches |>
+  arrange(desc(size))
 ```
 
-UNIV100 and ENES140 have a LOT of seats. Are they virtual classes? Hybrid? What else could we ask of this data?
+85,000 people is a big congregation. What else could we ask of this data?
