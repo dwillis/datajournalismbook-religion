@@ -1,0 +1,30 @@
+```{r}
+library(tidyverse)
+library(DBI)
+library(RSQLite)
+library(lubridate)
+```
+
+```{r}
+
+exempt_orgs <- read_csv("data/eo_md.csv")
+
+churches <- exempt_orgs |> 
+  filter(FOUNDATION == "10") |> 
+  mutate(zip5 = str_sub(ZIP, 1, 5))
+
+write_csv(churches, "data/churches_md.csv")
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```

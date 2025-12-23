@@ -1,0 +1,119 @@
+# Mutating data
+
+Often the data you have will prompt questions that it doesn't immediately answer. Election results, for example, have raw vote totals but we often don't use those to make comparisons between candidates unless the numbers are small. We need percentages!
+
+To do that in R, we can use `dplyr` and `mutate` to calculate new metrics in a new field using existing fields of data. That's the essence of `mutate` - using the data you have to answer a new question.
+
+So first we'll import the tidyverse so we can read in our data and begin to work with it.
+
+```{r}
+#| output: false
+library(tidyverse)
+```
+
+Now we'll import a dataset of county-level gubernatorial results from Maryland's 2022 general election that is in the data folder in this chapter's pre-lab directory. We'll use this to explore ways to create new information from existing data.
+
+```{r}
+general_22 <- read_csv('data/md_gov_county.csv')
+```
+
+Let's add a column called `percent_moore` for the percentage of votes that went to Wes Moore, the Democratic candidate who won the election, in each county. The code to calculate a percentage is pretty simple. Remember, with `summarize`, we used `n()` to count things. With `mutate`, we use very similar syntax to calculate a new value -- a new column of data -- using other values in our dataset.
+
+To calculate a percentage, we need both the number of votes for Moore but also the total number of votes. We'll use mutate to create both columns. The first will be total votes. The key here is to save the dataframe to itself so that our changes stick.
+
+```{r}
+general_22 <- general_22 |>
+  mutate(
+    total_votes = cox + moore + lashar + wallace + write_ins,
+    pct_moore = moore/total_votes
+  )
+```
+
+But what do you see right away? Do those numbers look like we expect them to? No. They're a decimal expressed as a percentage. So let's fix that by multiplying by 100. Since we're replacing the contents of our new `pct_moore` column, we can just update our previous code and run it again:
+
+```{r}
+general_22 <- general_22 |>
+  mutate(
+    pct_moore = (moore/total_votes)*100
+  )
+```
+
+Now, does this ordering do anything for us? No. Let's fix that with arrange.
+
+```{r}
+general_22 <- general_22 |>
+  mutate(
+    pct_moore = (moore/total_votes)*100
+  ) |> 
+  arrange(desc(pct_moore))
+```
+
+So now we have results ordered by `pct_moore` with the highest percentage first. To see the lowest percentage first, we can reverse that `arrange` function - we don't need to recalculate the column:
+
+```{r}
+general_22 |>
+  arrange(pct_moore)
+```
+
+Moore had his weakest performance in Garrett County, at the far western edge of the state.
+
+## Another use of mutate
+
+Mutate is also useful for standardizing data - for example, making different spellings of, say, campaign spending recipients.
+
+Let's load some Maryland state campaign expenditures into a `maryland_expenses` dataframe, and focus in particular on the `payee_name` column.
+
+```{r}
+maryland_expenses <- read_csv("data/maryland_expenses.csv")
+maryland_expenses
+```
+
+You'll notice that there's a mix of styles: lower-case and upper-case names like "Anedot" and "ANEDOT", for example. R will think those are two different payees, and that will mean that any aggregates we create based on payee_name won't be accurate.
+
+So how can we fix that? Mutate - it's not just for math! And a function called `str_to_upper` that will convert a character column into all uppercase.
+
+```{r}
+standardized_maryland_expenses <- maryland_expenses |>
+  mutate(
+    payee_upper = str_to_upper(payee_name)
+)
+```
+
+There are lots of potential uses for standardization - addresses, zip codes, anything that can be misspelled or abbreviated.
+
+## A more powerful use
+
+Mutate is even more useful when combined with some additional functions. Let's keep rolling with our expenditure data. Take a look at the address column: it contains a full address, including the state, spelled out. It would be useful to have a separate `state` column with an abbreviation. We can check to see if a state name is contained in that column and then populate a new column with the value we want, using the functions `str_detect` and `case_when`. We can identify the state by the following pattern: a space, followed by the full name, followed by another space. So, " Maryland ". The `case_when` function handles multiple variations, such as if the state is Maryland or the state is Texas, etc. Crucially, we can tell R to populate the new column with `NA` if it doesn't find a match.
+
+```{r}
+maryland_expenses_with_state <- maryland_expenses |>
+  mutate(
+    state = case_when(
+        str_detect(address, " Maryland ") ~ "MD",
+        str_detect(address, " California ") ~ "CA",
+        str_detect(address, " Washington ") ~ "WA",
+        str_detect(address, " Louisiana ") ~ "LA",
+        str_detect(address, " Florida ") ~ "FL",
+        str_detect(address, " North Carolina ") ~ "NC",
+        str_detect(address, " Massachusetts ") ~ "MA",
+        str_detect(address, " West Virginia ") ~ "WV",
+        str_detect(address, " Virginia ") ~ "VA",
+        .default = NA
+      )
+  )
+```
+
+There's a lot going on here, so let's unpack it. It starts out as a typical mutate statement, but `case_when` introduces some new things. Each line checks to see if the pattern is contained in the address column, followed by `~` and then a value for the new column for records that match that check. You can read it like this: "If we find ' Maryland ' in the address column, then put 'MD' in the state column" for Maryland and then a handful of states, and if we don't match any state we're looking for, make state `NA`.
+
+We can then use our new `state` column in group_by statements to make summarizing easier.
+
+```{r}
+maryland_expenses_with_state |>
+  group_by(state) |>
+  summarize(total = sum(amount)) |>
+  arrange(desc(total))
+```
+
+Most expenditures seem to have occurred in Maryland, which makes sense, although we haven't assigned a state for every transaction.
+
+Mutate is there to make your data more useful and to make it easier for you to ask more and better questions of it.

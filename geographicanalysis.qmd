@@ -1,0 +1,134 @@
+# Geographic analysis
+
+In the previous chapter, we looked at election precincts in Prince George's County to show a bit of a pattern regarding concentration of the precincts with the most and 0 eligible voters. Let's go little further and look at voters statewide.
+
+First, let's load the libraries we'll need, including tigris. We're also going to load tidycensus and set an API key for tidycensus.
+
+```{r}
+#| output: false
+library(tidyverse)
+library(sf)
+library(janitor)
+library(tigris)
+library(tidycensus)
+census_api_key("549950d36c22ff16455fe196bbbd01d63cfbe6cf")
+
+```
+
+In the previous chapter, we looked at foreclosure notices by zip codes to find patterns in Maryland. Let's go further and, instead of using raw numbers, use percentages based on the number of owner-occupied housing units in each zip code.
+
+For the rest of this chapter, we're going to work on building a map that will help us gain insight into geographic patterns in foreclosure notices by county in Maryland. What geographic patterns can we identify?
+
+First, we'll go out and get the county foreclosure notices and population data for each county using tidycensus. The variable for total population is B01001_001
+
+```{r}
+md_county_notices <- read_csv("data/Maryland_Foreclosure_Data_by_County.csv") |> slice(1) |> pivot_longer(cols=-c('Date', 'Type'), names_to='county', values_to = 'notices')
+
+md_county_population <- get_acs(geography = "county",
+              variables = c(population = "B01001_001"),
+              year = 2021,
+              state = "MD")
+```
+
+Ultimately, we're going to join this county table with population with foreclosure notices by county, and then calculate a percentage. But remember, we then want to visualize this data by drawing a zip code map that helps us pick out trends. Thinking ahead, we know we'll need a zip code map shapefile. Fortunately, we can pull this geometry information right from tidycensus at the same time that we pull in the population data by adding "geometry = TRUE" to our get_acs function.
+
+```{r}
+md_county_population <- get_acs(geography = "county",
+              variables = c(population = "B01001_001"),
+              year = 2021,
+              state = "MD",
+              geometry = TRUE)
+
+md_county_population
+```
+
+We now have a new column, geometry, that contains the "MULTIPOLYGON" data that will draw an outline of each county when we go to draw a map.
+
+The next step will be to join our population data to our foreclosure data on the county column.
+
+But there's a problem. The column in our population data that has county names is called "NAME", and it has the full name of the county spelled out in title case -- first word capitalized and has "County" and "Maryland" in it. The foreclosure data just has the name of the county. For example, the population data has "Anne Arundel County, Maryland" and the foreclosure data has "Anne Arundel County".
+
+```{r}
+md_county_population
+
+md_county_notices
+```
+
+If they're going to join properly, we need to clean one of them up to make it match the other.
+
+Let's clean the population table. We're going to rename the "NAME" column to "County", then remove ", Maryland" and "County" and make the county titlecase. Next we'll remove any white spaces after that first cleaning step that, if left in, would prevent a proper join. We're also going to rename the column that contains the population information from "estimate" to "population" and select only the county name and the population columns, along with the geometry. That leaves us with this tidy table.
+
+```{r}
+md_county_population <- md_county_population |>
+  rename(county = NAME) |>
+  mutate(county = str_to_title(str_remove_all(county,", Maryland"))) |>
+  mutate(county = str_trim(county,side="both")) |>
+  rename(population = estimate) |>
+  select(county, population, geometry)
+
+md_county_population
+```
+
+Now we can join them.
+
+```{r}
+md_pop_with_foreclosures <- md_county_population |>
+  left_join(md_county_notices, join_by(county))
+
+md_pop_with_foreclosures
+```
+
+Our final step before visualization, let's calculate the number of foreclosure notices per 1000 population and sort from highest to lowest to see what trends we can identify just from the table.
+
+```{r}
+md_pop_with_foreclosures <- md_county_population |>
+  left_join(md_county_notices, join_by(county)) |> 
+  mutate(rate = notices/population*1000) |>
+  arrange(desc(rate))
+
+md_pop_with_foreclosures
+```
+
+Let's take a look at the result of this table. The variances in the rates aren't huge, but there are some clear differences: Charles County and Prince George's County have higher rates, followed by Baltimore City and some more rural counties.
+
+First, let's use the counties() function from tigris to pull down a shapefile of all U.S. counties and grab the ones for Maryland.
+
+```{r}
+
+md_counties <- counties() |>
+  filter(STATEFP == "24")
+
+```
+
+Okay, now let's visualize. We're going to build a choropleth map, with the color of each county -- the fill -- set according to the number of notices per 1K population on a color gradient.
+
+```{r}
+county_centroids <- st_centroid(md_counties)
+county_centroids_df <- as.data.frame(st_coordinates(county_centroids))
+county_centroids_df$NAME <- county_centroids$NAME
+
+ggplot() +
+  geom_sf(data=md_pop_with_foreclosures, aes(fill=rate)) +
+  geom_text(aes(x = X, y = Y, label = NAME), data = county_centroids_df, size = 3, check_overlap = TRUE) +
+  theme_minimal()
+```
+
+This map is okay, but the color scale makes it hard to draw fine-grained differences. Let's try applying the magma color scale we learned in the last chapter.
+
+```{r}
+ggplot() +
+  geom_sf(data=md_pop_with_foreclosures, aes(fill=rate)) +
+  theme_minimal() +
+  scale_fill_viridis_b(option="magma")
+```
+
+The highest ranking counties stand out nicely in this version, but it's still hard to make out fine-grained differences between other counties.
+
+So let's change the color scale to a "log" scale, which will help us see those differences a bit more clearly.
+
+```{r}
+ggplot() +
+  geom_sf(data=md_pop_with_foreclosures, aes(fill=rate)) +
+  theme_minimal() +
+  scale_fill_viridis_b(option="magma",trans = "log")
+```

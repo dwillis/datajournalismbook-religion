@@ -1,0 +1,56 @@
+project:
+  type: website
+  render:
+    - "*.qmd"
+    - "!xl*.qmd"
+    - "!geographic-basics.qmd"
+    - "!geographicanalysis.qmd"
+    - "!textanalysis.qmd"
+    - "!prep.qmd"
+    - "!labs/"
+    - "!pre-labs/"
+    - "!data/"
+    - "!images/"
+
+website:
+  title: "Data Journalism with R and the Tidyverse"
+  search:
+    location: sidebar
+    type: textbox
+  sidebar:
+    style: "docked"
+    contents:
+      - index.qmd
+      - start-story.qmd
+      - start-math.qmd
+      - start-data-def.qmd
+      - ethics.qmd
+      - publicrecords.qmd
+      - github.qmd
+      - r-basics.qmd
+      - replication.qmd
+      - aggregates.qmd
+      - filters.qmd
+      - workingwithdates.qmd
+      - mutating.qmd
+      - data-cleaning-part-i.qmd
+      - data-cleaning-part-ii.qmd
+      - open-refine.qmd
+      - pdfs.qmd
+      - merging.qmd
+      - census.qmd
+      - visualizing-for-reporting.qmd
+      - visualizing-for-publication.qmd
+      - geographic-basics.qmd
+      - geographicanalysis.qmd
+      - textanalysis.qmd
+      - rvest.qmd
+      - basicstats.qmd
+      - ai_and_llms.qmd
+      - writingwithdata.qmd
+
+format:
+  html:
+    theme: simplex
+
+editor: visual
