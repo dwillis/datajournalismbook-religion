@@ -1,0 +1,178 @@
+---
+title: "Reverse Engineering: Changing Faiths"
+author: "Student Name"
+date: "2026-02-05"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(scipen=999)
+```
+
+## About this assignment
+
+In this assignment, you will reverse engineer findings from a FiveThirtyEight analysis by Leah Libresco: ["Evangelical Protestants Are The Biggest Winners When People Change Faiths."](http://fivethirtyeight.com/datalab/evangelical-protestants-are-the-biggest-winners-when-people-change-faiths/) The article uses data from Pew Research Center's 2014 Religious Landscape Study to model what would happen to America's religious makeup if people kept switching faiths at their current rates. A copy of the article has been saved as an HTML file in this folder for offline reference.
+
+The original code and data are from FiveThirtyEight's GitHub repository: <https://github.com/fivethirtyeight/data/tree/master/pew-religions>
+
+Your job is to read the article and the original Python code, then write your own R code to replicate specific findings. The original analysis was written in Python using NumPy matrix operations. You will reproduce the key results using R and the tidyverse.
+
+To complete this assignment, you need to: \* run existing code as directed (look for **Task**). \* write code in empty codeblocks provided to answer questions included (look for **Q**). \* write out the answer in the form of a complete sentence in the space given (look for **A**).
+
+When you are finished, commit changes and push to your personal GitHub repo, then submit the URL to this document on ELMS.
+
+## About the data
+
+The data comes from Pew's 2014 Religious Landscape Study, which surveyed more than 35,000 Americans about their religious beliefs and practices. For this analysis, the key question is: what religion were you raised in, and what religion are you now?
+
+From those responses, the original analysis built a **transition matrix** — a table where each row is the religion someone was raised in, and each column is the religion they hold as an adult. The values are probabilities. For example, if the row is "Catholic" and the column is "Evangelical Protestant," the value tells you the probability that someone raised Catholic is now an evangelical Protestant.
+
+You have four data files in the `data/` folder:
+
+| File | Description |
+|------|-------------|
+| `transition_matrix.csv` | 12x12 matrix of switching probabilities. Each row is a "raised in" religion; each column is a "current" religion. Each row sums to approximately 1.0. |
+| `initial_distribution.csv` | The starting share of each religion in the U.S. population (sums to ~1.0). These are roughly the shares of Americans who were *raised in* each tradition. |
+| `fertility_rates.csv` | Average number of children per woman for each religious group. |
+| `current.csv` | The output of the original Python simulation: 101 rows showing the religious distribution at each "year" (iteration 0 through 100) as the model approaches equilibrium. This is what you'll be checking your work against. |
+
+The 12 religious categories are: Buddhist, Catholic, Evangelical Protestant, Hindu, Historically Black Protestant, Jehovah's Witness, Jewish, Mainline Protestant, Mormon, Muslim, Orthodox Christian, and Unaffiliated.
+
+## Load libraries and data
+
+**Task** Run the codeblock below to load the tidyverse and all four data files.
+
+```{r}
+library(tidyverse)
+
+transition <- read_csv("data/transition_matrix.csv")
+initial <- read_csv("data/initial_distribution.csv")
+fertility <- read_csv("data/fertility_rates.csv")
+simulation <- read_csv("data/current.csv",
+                       col_names = c("Buddhist", "Catholic", "Evangelical Protestant",
+                                     "Hindu", "Historically Black Protestant",
+                                     "Jehovahs Witness", "Jewish", "Mainline Protestant",
+                                     "Mormon", "Muslim", "Orthodox Christian", "Unaffiliated"))
+```
+
+**Task** Run the codeblocks below to examine the data.
+
+```{r}
+# The transition matrix: each row is a "raised in" religion, each column is where they ended up
+transition
+```
+
+```{r}
+# The starting distribution
+initial
+```
+
+```{r}
+# Fertility rates
+fertility
+```
+
+```{r}
+# First and last rows of the simulation output
+head(simulation, 1)
+tail(simulation, 1)
+```
+
+## Questions
+
+### Q1: Retention rates
+
+The article reports specific retention rates: the share of people raised in a religion who still identify with it as adults. For example, the article says that evangelical Protestants have a 65% retention rate, Catholics have 59%, and mainline Protestants have 45%.
+
+The retention rate for each religion is simply the diagonal of the transition matrix — the value in the row and column for the same religion. Extract the retention rate for each religion from the transition matrix. Which religion has the highest retention rate? Which has the lowest? Do your numbers match what the article reports for evangelicals, Catholics, and mainline Protestants?
+
+**A1.**
+
+```{r}
+```
+
+### Q2: Where do the converts go?
+
+The article highlights several specific conversion flows: "About 10 percent of people raised Catholic now identify as evangelical Protestants ... while only 2 percent of people raised as evangelicals are now Catholic." It also notes that "19 percent of people raised as mainline Protestants now identify as evangelical, while only 12 percent of evangelicals have become mainline Protestants."
+
+Using the transition matrix, verify these specific claims. For each of the following pairs, find the conversion rate in each direction:
+
+- Catholic → Evangelical Protestant, and Evangelical Protestant → Catholic
+- Mainline Protestant → Evangelical Protestant, and Evangelical Protestant → Mainline Protestant
+
+Then pick one additional religion and describe where its members go when they leave. What are the top two or three destinations?
+
+**A2.**
+
+```{r}
+```
+
+### Q3: Net winners and losers from conversion alone
+
+The article builds toward one of its core findings: some religions are net winners from conversion (they gain more members than they lose), while others are net losers. The article reports that if current switching patterns continued until the population stabilized, evangelical Protestants would grow from 26% to 32%, the unaffiliated would grow from 23% to 29%, while Catholics would shrink from 21% to 8%.
+
+To test this, you need to apply the transition matrix to the initial distribution — one "generation" of switching. Here's the logic: if you multiply the share of people in each religion by their probability of switching to each other religion, you get the new distribution after one round of conversion.
+
+Do the following:
+1. Start with the initial distribution (as a named vector or single-row dataframe of the 12 religion shares, normalized to sum to 1).
+2. Create a matrix version of the transition probabilities (just the numeric columns from the transition matrix).
+3. Multiply the initial distribution by the transition matrix to get the distribution after one round of switching. In R, if `init` is a 1x12 matrix and `trans` is a 12x12 matrix, the operation is `init %*% trans`.
+4. Repeat this multiplication several more times (try 100 iterations in a loop) to see where the distribution stabilizes.
+5. Compare your final (equilibrium) distribution to the starting distribution. Which religions gained? Which lost? Does your result match the article's claim about evangelicals reaching 32% and Catholics falling to 8%?
+
+*Note: For this question, do NOT include fertility — just conversion alone.*
+
+**A3.**
+
+```{r}
+```
+
+### Q4: Verify against the original simulation
+
+The file `current.csv` contains the output from the original Python simulation, which DID include fertility rates. Each row represents one "year" (iteration), and each column is the share of the population in that religion.
+
+The original model works like this each iteration: (1) apply the transition matrix (conversion), (2) divide each group's share by 2 (to represent couples), (3) multiply by fertility rates, and (4) re-normalize to sum to 1.
+
+Replicate this simulation in R:
+1. Start with the initial distribution (normalized to sum to 1).
+2. For each of 100 iterations: apply the transition matrix, divide by 2, multiply by the fertility rates, and normalize.
+3. Compare your final distribution to the last row of `current.csv`. They should match (or be very close).
+4. What are the biggest differences between the conversion-only equilibrium (Q3) and the conversion-plus-fertility equilibrium? Which religions benefit most from including fertility? Which are hurt most?
+
+The article notes that with fertility included, Mormons (fertility rate of 3.4 children per woman) would eventually reach 22% of the population, and Muslims (2.8) would reach 8%, while the unaffiliated (1.7) would actually shrink from 23% to 19% instead of growing.
+
+**A4.**
+
+```{r}
+```
+
+### Q5: Visualizing the trajectory
+
+Now that you have the simulation data (either from `current.csv` or from your own simulation in Q4), create a line chart showing how each religion's share of the population changes over the 100 iterations.
+
+Your chart should have:
+
+- Year/iteration on the x-axis
+- Population share (as a percentage) on the y-axis
+- A separate colored line for each religion
+- A clear title and labeled axes
+- A legend identifying each religion
+
+You'll need to pivot the simulation data from wide to long format first.
+
+Which religions show the most dramatic change over time? Which ones stabilize quickly vs. slowly? Write 2-3 sentences describing what the chart reveals about the long-term trajectory of religious change in America under this model.
+
+**A5.**
+
+```{r}
+```
+
+### Q6: Limitations and story ideas
+
+The article's model makes several simplifying assumptions: conversion rates stay constant, fertility rates don't change, there's no immigration, and there are no generational differences in switching behavior.
+
+Think about this as a data journalist. What are the most important limitations of this model? If you were writing a follow-up story, what additional data would you want? Pick one specific limitation and describe how it might change the conclusions. Write 3-4 sentences.
+
+**A6.**
+
