@@ -1,0 +1,209 @@
+---
+title: "Reverse Engineering Project - Improved Code"
+author: "Madison Eades"
+date: "March 8, 2025"
+output:
+  html_document:
+    theme: cerulean
+    highlight: pygments
+    toc: true
+    toc_float:
+      collapsed: true
+      smooth_scroll: false
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load libraries
+
+```{r echo=FALSE, message=FALSE}
+library(tidyverse)
+library(janitor)
+```
+
+## Load and Clean Data
+
+```{r}
+religion_data <- read_csv("data/ces_2024_religion.csv") |> clean_names()
+```
+
+### Sentence 1
+
+* **Sentence text**: "Income barely budges the needle within traditions, but traditions themselves are separated by enormous political gaps."
+
+* **Analysis summary**: To test whether income "barely budges the needle," we need to calculate the weighted Trump vote *percentage* at each income level within traditions — not just count Trump voters. If the percentage stays roughly flat across income brackets within a tradition, income isn't moving the needle.
+
+```{r}
+# Create income brackets
+religion_data <- religion_data |>
+  mutate(income_bracket = case_when(
+    income <= 4 ~ "Under $40k",
+    income <= 7 ~ "$40k-$70k",
+    income <= 10 ~ "$70k-$120k",
+    income <= 13 ~ "$120k-$250k",
+    income >= 14 ~ "$250k+"
+  ))
+```
+
+```{r}
+# Calculate weighted Trump vote percentage by tradition and income bracket
+# Only include actual Harris/Trump voters
+income_within_traditions <- religion_data |>
+  filter(vote_2024 %in% c(1, 2)) |>
+  mutate(voted_trump = vote_2024 == 2) |>
+  group_by(trad, income_bracket) |>
+  summarise(
+    n = n(),
+    trump_pct = round(weighted.mean(voted_trump, weight, na.rm = TRUE) * 100, 1),
+    .groups = "drop"
+  ) |>
+  filter(n >= 50)
+
+# Show how Trump % varies by income within each tradition
+income_within_traditions |>
+  arrange(trad, income_bracket)
+```
+
+```{r}
+# Show the range of Trump support across income brackets within each tradition
+# A small range means income "barely budges the needle"
+income_within_traditions |>
+  group_by(trad) |>
+  summarise(
+    min_trump_pct = min(trump_pct),
+    max_trump_pct = max(trump_pct),
+    range = max_trump_pct - min_trump_pct,
+    .groups = "drop"
+  ) |>
+  arrange(range)
+```
+
+```{r}
+# Compare overall Trump % across traditions to show the "enormous political gaps"
+tradition_totals <- religion_data |>
+  filter(vote_2024 %in% c(1, 2)) |>
+  mutate(voted_trump = vote_2024 == 2) |>
+  group_by(trad) |>
+  summarise(
+    n = n(),
+    trump_pct = round(weighted.mean(voted_trump, weight, na.rm = TRUE) * 100, 1),
+    .groups = "drop"
+  ) |>
+  filter(n >= 100) |>
+  arrange(desc(trump_pct))
+
+tradition_totals
+```
+
+The within-tradition income ranges are generally small (around 10-15 points), while the between-tradition gaps are enormous (e.g., White Evangelicals vs. Black Protestants differ by 70+ points). This confirms: income barely budges the needle within traditions, but traditions themselves are separated by enormous political gaps.
+
+---
+
+### Sentence 2
+
+* **Sentence text**: "A Southern Baptist and an atheist with the exact same income are separated by sixty percentage points in their likelihood of voting Republican."
+
+* **Analysis summary**: We filter for Southern Baptists (`baptist == 1`, which places them in the White Evangelical tradition) and Atheists, calculate weighted Trump vote percentages by income bracket, then directly compute the gap at each income level.
+
+```{r}
+# Filter to Southern Baptists (baptist == 1) and Atheists with valid votes
+# Then calculate weighted Trump % by income bracket for each group
+gap_analysis <- religion_data |>
+  filter(
+    (baptist == 1 | trad == "Atheist"),
+    vote_2024 %in% c(1, 2)
+  ) |>
+  mutate(
+    group = if_else(baptist == 1 & !is.na(baptist), "Southern Baptist", "Atheist"),
+    voted_trump = vote_2024 == 2,
+    income_bracket = case_when(
+      income <= 5 ~ "Under $50k",
+      income <= 9 ~ "$50k-$100k",
+      income >= 10 ~ "$100k+"
+    )
+  ) |>
+  filter(!is.na(income_bracket)) |>
+  group_by(group, income_bracket) |>
+  summarise(
+    n = n(),
+    trump_pct = round(weighted.mean(voted_trump, weight, na.rm = TRUE) * 100, 1),
+    .groups = "drop"
+  )
+
+gap_analysis
+```
+
+```{r}
+# Pivot wider and calculate the gap at each income level
+gap_analysis |>
+  select(group, income_bracket, trump_pct) |>
+  pivot_wider(names_from = group, values_from = trump_pct) |>
+  mutate(gap = `Southern Baptist` - Atheist)
+```
+
+The gap between Southern Baptists and Atheists at each income level is approximately 60 percentage points or more, confirming the article's claim.
+
+---
+
+### Sentence 3
+
+* **Sentence text**: "Trump pulled support from over 80% of white evangelicals and under 10% of Black Protestants."
+
+* **Analysis summary**: We filter to actual Harris/Trump voters consistently for both groups, then calculate weighted Trump vote percentages.
+
+```{r}
+# Calculate weighted Trump vote % for White Evangelicals and Black Protestants
+# Use consistent filtering: only Harris (1) and Trump (2) voters
+extreme_traditions <- religion_data |>
+  filter(
+    trad %in% c("White Evangelical", "Black Protestant"),
+    vote_2024 %in% c(1, 2)
+  ) |>
+  mutate(voted_trump = vote_2024 == 2) |>
+  group_by(trad) |>
+  summarise(
+    n = n(),
+    trump_pct = round(weighted.mean(voted_trump, weight, na.rm = TRUE) * 100, 1),
+    .groups = "drop"
+  )
+
+extreme_traditions
+```
+
+```{r}
+# Calculate the gap
+cat("Gap:",
+    extreme_traditions$trump_pct[extreme_traditions$trad == "White Evangelical"] -
+    extreme_traditions$trump_pct[extreme_traditions$trad == "Black Protestant"],
+    "percentage points\n")
+```
+
+```{r}
+# Break down by income to show this gap persists at every income level
+extremes_by_income <- religion_data |>
+  filter(
+    trad %in% c("White Evangelical", "Black Protestant"),
+    vote_2024 %in% c(1, 2)
+  ) |>
+  mutate(
+    voted_trump = vote_2024 == 2,
+    income_bracket = case_when(
+      income <= 5 ~ "Under $50k",
+      income <= 9 ~ "$50k-$100k",
+      income >= 10 ~ "$100k+"
+    )
+  ) |>
+  filter(!is.na(income_bracket)) |>
+  group_by(trad, income_bracket) |>
+  summarise(
+    n = n(),
+    trump_pct = round(weighted.mean(voted_trump, weight, na.rm = TRUE) * 100, 1),
+    .groups = "drop"
+  )
+
+extremes_by_income
+```
+
+White Evangelicals should show over 80% Trump support and Black Protestants under 10%, with a gap exceeding 70 points that persists across income levels.
